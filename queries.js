@@ -1,101 +1,114 @@
-const Pool = require("pg").Pool;
-const dotenv = require('dotenv');
+const { Sequelize, DataTypes } = require("sequelize");
+const dotenv = require("dotenv");
 dotenv.config();
 
-const pool = new Pool({
-  user: process.env.DB_USER,
+const sequelize = new Sequelize({
+  dialect: "postgres",
   host: process.env.DB_HOST,
   database: process.env.DB_DATABASE,
+  username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
+  logging: false,
 });
 
-const yup = require("yup");
+const Todo = sequelize.define(
+  "crud_todo",
+  {
+    text: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    isCompleted: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+    },
+  },
+  {
+    tableName: "crud_todo",
+  }
+);
 
-const todoSchema = yup.object().shape({
-  text: yup.string().required(),
-  isCompleted: yup.boolean().required(),
-});
+// Create the table if it does not exist
+Todo.sync()
+  .then(() => {
+    console.log("crud_todo table created (if not existed)");
+  })
+  .catch((error) => {
+    console.error("Error creating crud_todo table:", error);
+  });
 
 // GET all todos
-const getUsers = (request, response) => {
-  pool.query("SELECT * FROM todos ORDER BY id ASC", (error, results) => {
-    if (error) {
-      throw error;
-    }
-    response.status(200).json(results.rows);
-  });
+const getUsers = async (request, response) => {
+  try {
+    const todos = await Todo.findAll();
+    response.status(200).json(todos);
+  } catch (error) {
+    response.status(500).json({ error: error.message });
+  }
 };
 
 // GET a single todo by ID
-const getUserById = (request, response) => {
+const getUserById = async (request, response) => {
   const id = parseInt(request.params.id);
 
-  pool.query("SELECT * FROM todos WHERE id = $1", [id], (error, results) => {
-    if (error) {
-      throw error;
+  try {
+    const todo = await Todo.findByPk(id);
+    if (todo) {
+      response.status(200).json(todo);
+    } else {
+      response.status(404).json({ message: "Todo not found" });
     }
-    response.status(200).json(results.rows);
-  });
+  } catch (error) {
+    response.status(500).json({ error: error.message });
+  }
 };
 
 // POST a new todo
-const createUser = (request, response) => {
+const createUser = async (request, response) => {
   const { text, isCompleted } = request.body;
 
-  todoSchema
-    .validate({ text, isCompleted })
-    .then(() => {
-      pool.query(
-        "INSERT INTO todos (text, isCompleted) VALUES ($1, $2) RETURNING *",
-        [text, isCompleted],
-        (error, results) => {
-          if (error) {
-            throw error;
-          }
-          response.status(201).json(results.rows[0]);
-        }
-      );
-    })
-    .catch((error) => {
-      response.status(400).json({ error: error.errors[0] });
-    });
+  try {
+    const todo = await Todo.create({ text, isCompleted });
+    response.status(201).json(todo);
+  } catch (error) {
+    response.status(400).json({ error: error.message });
+  }
 };
 
 // PUT updated data for an existing todo
-const updateUser = (request, response) => {
+const updateUser = async (request, response) => {
   const id = parseInt(request.params.id);
   const { text, isCompleted } = request.body;
 
-  todoSchema
-    .validate({ text, isCompleted })
-    .then(() => {
-      pool.query(
-        "UPDATE todos SET text = $1, isCompleted = $2 WHERE id = $3 RETURNING *",
-        [text, isCompleted, id],
-        (error, results) => {
-          if (error) {
-            throw error;
-          }
-          response.status(200).json(results.rows[0]);
-        }
-      );
-    })
-    .catch((error) => {
-      response.status(400).json({ error: error.errors[0] });
-    });
+  try {
+    const todo = await Todo.findByPk(id);
+    if (todo) {
+      await todo.update({ text, isCompleted });
+      response.status(200).json(todo);
+    } else {
+      response.status(404).json({ message: "Todo not found" });
+    }
+  } catch (error) {
+    response.status(400).json({ error: error.message });
+  }
 };
 
 // DELETE a todo
-const deleteUser = (request, response) => {
+const deleteUser = async (request, response) => {
   const id = parseInt(request.params.id);
 
-  pool.query("DELETE FROM todos WHERE id = $1", [id], (error, results) => {
-    if (error) {
-      throw error;
+  try {
+    const todo = await Todo.findByPk(id);
+    if (todo) {
+      await todo.destroy();
+      response.status(200).send(`TODO deleted with ID: ${id}`);
+    } else {
+      response.status(404).json({ message: "Todo not found" });
     }
-    response.status(200).send(`TODO deleted with ID: ${id}`);
-  });
+  } catch (error) {
+    response.status(500).json({ error: error.message });
+  }
 };
 
 module.exports = {
@@ -105,4 +118,3 @@ module.exports = {
   updateUser,
   deleteUser,
 };
-

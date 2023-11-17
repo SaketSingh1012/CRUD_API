@@ -24,4 +24,3 @@ app.delete("/todos/:id", db.deleteUser);
 app.listen(port, () => {
   console.log(`App running on port http://localhost:${port}.`);
 });
-
