@@ -3,6 +3,7 @@
 ## Clone the Repository
 ```bash
   git clone https://github.com/SaketSingh1012/CRUD_API.git
+  cd CRUD_API
   npm install
   ```
 ## Configure Environment Variables
